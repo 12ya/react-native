@@ -38,17 +38,13 @@ let argv = yargs
   .option('t', {
     alias: 'token',
     describe:
-      'Your CircleCI personal API token. See https://circleci.com/docs/2.0/managing-api-tokens/#creating-a-personal-api-token to set one',
+      'Your Github Action personal API token. See https://circleci.com/docs/2.0/managing-api-tokens/#creating-a-personal-api-token to set one',
     required: true,
   })
   .option('v', {
     alias: 'to-version',
     describe: 'Version you aim to release, ex. 0.67.0-rc.1, 0.66.3',
     required: true,
-  })
-  .option('dry-run', {
-    type: 'boolean',
-    default: false,
   })
   .check(() => {
     const branch = exitIfNotOnGit(
@@ -183,34 +179,30 @@ async function main() {
   }
 
   const parameters = {
-    run_release_workflow: true,
-    release_version: version,
-    release_tag: npmTag,
-    // NOTE: Necessary for 0.74, should be dropped for 0.75+
-    release_monorepo_packages_version: nextMonorepoPackagesVersion,
-    // $FlowFixMe[prop-missing]
-    release_dry_run: argv.dryRun,
+    version: version,
+    tag: npmTag,
   };
 
   const options = {
     method: 'POST',
-    url: 'https://circleci.com/api/v2/project/github/facebook/react-native/pipeline',
+    url: 'https://api.github.com/repos/facebook/react-native/actions/workflows/prepare-release/dispatches',
     headers: {
-      'Circle-Token': token,
-      'content-type': 'application/json',
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28',
     },
     body: {
-      branch,
-      parameters,
+      ref: branch,
+      inputs: parameters,
     },
     json: true,
   };
 
-  // See response: https://circleci.com/docs/api/v2/#operation/triggerPipeline
-  const body = await triggerReleaseWorkflow(options);
+  // See response: https://docs.github.com/en/rest/actions/workflows?apiVersion=2022-11-28#create-a-workflow-dispatch-event
+  await triggerReleaseWorkflow(options);
   console.log(
     // $FlowFixMe[incompatible-use]
-    `Monitor your release workflow: https://app.circleci.com/pipelines/github/facebook/react-native/${body.number}`,
+    'Monitor your release workflow: https://github.com/facebook/react-native/actions/workflows/prepare-release.yml',
   );
 
   // TODO
